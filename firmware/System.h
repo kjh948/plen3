@@ -28,11 +28,11 @@ class Stream;
 
 // Hardcoded WiFi Credentials
 #ifndef WIFI_SSID
-#define WIFI_SSID "kjh948_2"
+#define WIFI_SSID "SSID"
 #endif
 
 #ifndef WIFI_PASS
-#define WIFI_PASS "jeeh19800413!"
+#define WIFI_PASS "PASSWD"
 #endif
 
 namespace PLEN2 {
