@@ -231,6 +231,7 @@ void handleFileList() {
 #include "MotionController.h"
 
 extern PLEN2::MotionController motion_ctrl;
+extern PLEN2::JointController joint_ctrl;
 
 const char *INDEX_HTML = R"rawliteral(
 <!DOCTYPE html>
@@ -243,6 +244,11 @@ const char *INDEX_HTML = R"rawliteral(
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1a1a1a; color: #ffffff; text-align: center; padding: 20px; }
         h1 { margin-bottom: 30px; }
         .container { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
+        .control-panel { background: #2a2a2a; padding: 20px; border-radius: 15px; width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 15px; }
+        input[type=number], input[type=range] { padding: 10px; border-radius: 5px; border: 1px solid #444; background: #333; color: white; width: 90%; }
+        input[type=range] { padding: 0; }
+        label { text-align: left; width: 100%; font-size: 0.9em; color: #ccc; }
+        
         button {
             background: linear-gradient(135deg, #6e8efb, #a777e3);
             border: none;
@@ -261,28 +267,99 @@ const char *INDEX_HTML = R"rawliteral(
         }
         button:hover { transform: translateY(-2px); box-shadow: 0 6px 20px 0 rgba(110, 142, 251, 0.9); }
         button:active { transform: translateY(1px); }
-        
+        button.secondary { background: linear-gradient(135deg, #444, #666); box-shadow: 0 4px 15px 0 rgba(100, 100, 100, 0.5); }
+        button.secondary:hover { box-shadow: 0 6px 20px 0 rgba(100, 100, 100, 0.7); }
         .status { margin-top: 20px; color: #aaa; font-size: 0.9em; }
     </style>
     <script>
+        let debounceTimer;
+
         function playMotion(slot) {
+            updateStatus('Playing motion ' + slot + '...');
             fetch('/play?slot=' + slot)
                 .then(response => response.text())
+                .then(data => updateStatus('Status: ' + data))
+                .catch(error => updateStatus('Error: ' + error));
+        }
+
+        function onIdChange() {
+            const id = document.getElementById('jointId').value;
+            if(id === "") return;
+            fetch('/getHome?id=' + id)
+                .then(response => response.text())
                 .then(data => {
-                    document.getElementById('status').innerText = 'Status: ' + data;
+                    if(!isNaN(data)) {
+                        document.getElementById('jointAngle').value = data;
+                        document.getElementById('jointSlider').value = data;
+                        updateStatus('Loaded Joint ' + id + ' Offset: ' + data);
+                    } else {
+                        updateStatus('Error loading offset: ' + data);
+                    }
                 })
-                .catch(error => {
-                    document.getElementById('status').innerText = 'Error: ' + error;
-                });
+                .catch(error => updateStatus('Error fetching home: ' + error));
+        }
+
+        function onSliderChange(val) {
+            document.getElementById('jointAngle').value = val;
+            scheduleUpdate();
+        }
+
+        function onInputChange(val) {
+            document.getElementById('jointSlider').value = val;
+            scheduleUpdate();
+        }
+
+        function scheduleUpdate() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(setHome, 10); // 10ms debounce for near real-time response
+        }
+
+        function setHome() {
+            const id = document.getElementById('jointId').value;
+            const angle = document.getElementById('jointAngle').value;
+            if(!id || angle === "") return;
+            
+            // updateStatus('Setting Home: ID=' + id + ' Angle=' + angle); // Too spammy for slider
+            fetch('/setHome?id=' + id + '&angle=' + angle)
+                .then(response => response.text())
+                .then(data => { /* silent success for smooth sliding */ })
+                .catch(error => updateStatus('Error: ' + error));
+        }
+
+        function saveHome() {
+            if(!confirm('Save current home calibration to EEPROM?')) return;
+            updateStatus('Saving Home Config...');
+            fetch('/saveHome')
+                .then(response => response.text())
+                .then(data => updateStatus('Save Result: ' + data))
+                .catch(error => updateStatus('Error: ' + error));
+        }
+
+        function updateStatus(msg) {
+            document.getElementById('status').innerText = msg;
         }
     </script>
 </head>
 <body>
     <h1>ViVi Robot Control</h1>
+    
     <div class="container">
+        <div class="control-panel">
+            <h3>Joint Calibration</h3>
+            <label>Joint ID:</label>
+            <input type="number" id="jointId" placeholder="ID (0-23)" onchange="onIdChange()">
+            
+            <label>Offset Angle:</label>
+            <input type="range" id="jointSlider" min="-800" max="800" value="0" oninput="onSliderChange(this.value)">
+            <input type="number" id="jointAngle" placeholder="Angle" value="0" oninput="onInputChange(this.value)">
+            
+            <button class="secondary" onclick="saveHome()">Save All to ROM</button>
+        </div>
+
         <button onclick="playMotion(46)">Walk</button>
         <button onclick="playMotion(0)">Stop</button>
     </div>
+    
     <div class="status" id="status">Status: Ready</div>
 </body>
 </html>
@@ -299,23 +376,6 @@ void PLEN2::System::smart_config() {
       httpServer.on("/", HTTP_GET,
                     []() { httpServer.send(200, "text/html", INDEX_HTML); });
 
-      // list directory
-      httpServer.on("/list", HTTP_GET, handleFileList);
-      // load editor
-      httpServer.on("/edit", HTTP_GET, []() {
-        if (!handleFileRead("/edit.htm"))
-          httpServer.send(404, "text/plain", "FileNotFound");
-      });
-      // create file
-      httpServer.on("/edit", HTTP_PUT, handleFileCreate);
-      // delete file
-      httpServer.on("/edit", HTTP_DELETE, handleFileDelete);
-      // first callback is called after the request has ended with all parsed
-      // arguments second callback handles file uploads at that location
-      httpServer.on(
-          "/edit", HTTP_POST, []() { httpServer.send(200, "text/plain", ""); },
-          handleFileUpload);
-
       // Trigger Motion Endpoint
       httpServer.on("/play", HTTP_GET, []() {
         if (httpServer.hasArg("slot")) {
@@ -325,6 +385,46 @@ void PLEN2::System::smart_config() {
           httpServer.send(200, "text/plain", "Playing motion slot " + slotStr);
         } else {
           httpServer.send(400, "text/plain", "Missing slot argument");
+        }
+      });
+
+      // Set Home Offset Endpoint
+      httpServer.on("/setHome", HTTP_GET, []() {
+        if (httpServer.hasArg("id") && httpServer.hasArg("angle")) {
+          int id = httpServer.arg("id").toInt();
+          int angle = httpServer.arg("angle").toInt();
+          if (id >= 0 && id < 24) { // Assuming JointController::SUM is 24
+            joint_ctrl.setHomeAngle(id, angle);
+            httpServer.send(200, "text/plain",
+                            "Set Home ID:" + String(id) +
+                                " Angle:" + String(angle));
+          } else {
+            httpServer.send(400, "text/plain", "Invalid ID");
+          }
+        } else {
+          httpServer.send(400, "text/plain", "Missing id or angle");
+        }
+      });
+
+      // Save Home Configuration Endpoint
+      httpServer.on("/saveHome", HTTP_GET, []() {
+        joint_ctrl.resetSettings(); // This usually implies saving/resetting
+                                    // current values as home to storage
+        httpServer.send(200, "text/plain", "Home settings saved.");
+      });
+
+      // Get Home Offset Endpoint
+      httpServer.on("/getHome", HTTP_GET, []() {
+        if (httpServer.hasArg("id")) {
+          int id = httpServer.arg("id").toInt();
+          if (id >= 0 && id < 24) {
+            int angle = joint_ctrl.getHomeAngle(id);
+            httpServer.send(200, "text/plain", String(angle));
+          } else {
+            httpServer.send(400, "text/plain", "Invalid ID");
+          }
+        } else {
+          httpServer.send(400, "text/plain", "Missing id");
         }
       });
 
