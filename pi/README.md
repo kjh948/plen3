@@ -43,8 +43,12 @@ python3 run.py /path/to/firmware/data/00_LStep.json
 
 ## 모터 채널 매핑 (Motor Channel Mapping)
 
-PCA9685의 16개 채널(0 ~ 15)에 연결된 모터는 다음과 같습니다.
-기존 펌웨어에서 GPIO로 제어하던 `shoulder_pitch` (ID 0, 12) 관절은 제외되었습니다.
+![PLEN Joint Map](https://cdn.hackaday.io/images/9758191504929970906.jpg)
+
+위 이미지를 참고하여 각 관절의 ID와 역할을 확인할 수 있습니다.
+NanoPi 구현에서는 16채널 PWM 드라이버(PCA9685)를 사용하므로, 펌웨어 원본의 GPIO 제어 관절(**0: Left Shoulder Pitch**, **12: Right Shoulder Pitch**)은 제외되었습니다.
+
+PCA9685의 16개 채널(0 ~ 15)은 다음과 같이 매핑됩니다.
 
 ### Left Side (0 ~ 7)
 | Channel | Joint Name | ID | Description |
@@ -72,3 +76,4 @@ PCA9685의 16개 채널(0 ~ 15)에 연결된 모터는 다음과 같습니다.
 
 ---
 **Note**: `left_shoulder_pitch` (ID 0)와 `right_shoulder_pitch` (ID 12)는 이 구현에서 제어되지 않습니다.
+

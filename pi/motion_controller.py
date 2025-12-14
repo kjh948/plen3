@@ -42,7 +42,7 @@ class MotionController:
             data = json.load(f)
         return data
 
-    def play(self, file_path):
+    def play(self, file_path, speed=1.0):
         """
         Plays a motion file.
         This blocking function runs the loop.
@@ -56,7 +56,7 @@ class MotionController:
             motion_data = self.load_motion(file_path)
             frames = motion_data.get('frames', [])
             
-            logger.info(f"Playing motion: {motion_data.get('name', 'Unknown')} with {len(frames)} frames")
+            logger.info(f"Playing motion: {motion_data.get('name', 'Unknown')} with {len(frames)} frames at {speed}x speed")
 
             # Reset logic if needed? Usually motions start from current position.
             # We need to interpolate from CURRENT position to FIRST frame?
@@ -88,7 +88,12 @@ class MotionController:
                 if self.stop_flag:
                     break
                 
+                # Apply speed factor (higher speed means lower transition time)
                 transition_time = frame.get('transition_time_ms', 200)
+                if speed > 0:
+                    transition_time /= speed
+                
+
                 outputs = frame.get('outputs', [])
                 
                 # Build target deviations for this frame

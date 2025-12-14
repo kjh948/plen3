@@ -1,28 +1,7 @@
 import json
 import os
 import logging
-
-try:
-    from adafruit_pca9685 import PCA9685
-    from board import SCL, SDA
-    import busio
-except ImportError:
-    print("Adafruit libraries not found. Using mock mode if testing logic.")
-    # Simple mocks for testing elsewhere
-    class PCA9685:
-        def __init__(self, i2c): pass
-        @property
-        def channels(self): return [MockChannel() for _ in range(16)]
-        @property
-        def frequency(self): return 60
-        @frequency.setter
-        def frequency(self, v): pass
-    class MockChannel:
-        duty_cycle = 0
-    class busio:
-        I2C = lambda x, y: None
-    SCL = None
-    SDA = None
+from pca9685_driver import PCA9685
 
 logger = logging.getLogger(__name__)
 
@@ -108,14 +87,23 @@ class JointController:
     ]
 
     def __init__(self):
-        # Initialize I2C and PCA9685
+        # Initialize PCA9685 using local driver
+        # Defaulting to 0x60 as per Emakefun driver, but 0x40 is standard.
+        # Use 0x60 since user referred to Emakefun repo.
         try:
-            i2c = busio.I2C(SCL, SDA)
-            self.pca = PCA9685(i2c)
-            self.pca.frequency = self.PWM_FREQ
+            self.pca = PCA9685(address=0x60)
+            self.pca.setPWMFreq(self.PWM_FREQ)
+            logger.info("PCA9685 Initialized at 0x60")
         except Exception as e:
-            logger.error(f"Failed to initialize PCA9685: {e}")
-            self.pca = None
+            logger.error(f"Failed to initialize PCA9685 at 0x60: {e}")
+            # Fallback check for 0x40?
+            try:
+                self.pca = PCA9685(address=0x40)
+                self.pca.setPWMFreq(self.PWM_FREQ)
+                logger.info("PCA9685 Initialized at 0x40")
+            except Exception as e2:
+                logger.error(f"Failed to initialize PCA9685 at 0x40: {e2}")
+                self.pca = None
 
         self.settings = []
         for s in self.SETTINGS_INITIAL:
@@ -151,8 +139,7 @@ class JointController:
         return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
 
     def get_pwm_ticks(self, angle):
-        # Map angle (-800 to 800) to PWM (175 to 575)
-        # Using Clockwise logic (assumed standard)
+        # Map angle (-800 to 800) to PWM ticks (175 to 575)
         return int(self.map_range(angle, self.ANGLE_MIN, self.ANGLE_MAX, self.PWM_MIN, self.PWM_MAX))
 
     def set_angle(self, joint_id, angle):
@@ -177,14 +164,12 @@ class JointController:
 
         # Write to PCA
         if self.pca:
-            # PCA9685 duty_cycle is 16-bit (0-65535).
-            # Our ticks are 12-bit (0-4095).
-            # adafruit library takes 16-bit duty cycle.
-            # So multiply ticks by 16.
-            duty = int(ticks * 16)
-            self.pca.channels[channel].duty_cycle = duty
+            # Local driver uses setPWM(channel, on, off)
+            # off value is the ticks (0 to ticks)
+            self.pca.setPWM(channel, 0, ticks)
             
         return True
+
 
     def set_angle_diff(self, joint_id, angle_diff):
         if joint_id >= self.SUM:

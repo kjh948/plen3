@@ -31,9 +31,16 @@ def main():
 
     if len(sys.argv) > 1:
         motion_file = sys.argv[1]
+        speed = 1.0
+        if len(sys.argv) > 2:
+            try:
+                speed = float(sys.argv[2])
+            except ValueError:
+                logger.error("Invalid speed argument. Using default 1.0")
+
         if os.path.exists(motion_file):
-            logger.info(f"Playing provided motion file: {motion_file}")
-            motion_ctrl.play(motion_file)
+            logger.info(f"Playing provided motion file: {motion_file} at {speed}x speed")
+            motion_ctrl.play(motion_file, speed)
         else:
             logger.error(f"File not found: {motion_file}")
     else:
@@ -48,24 +55,32 @@ def main():
             name = os.path.basename(f)
             print(f"{i}: {name}")
         
-        print("\nEnter number to play, or 'q' to quit.")
+        print("\nEnter number to play (optionally followed by speed, e.g. '0 2.0'), or 'q' to quit.")
         
         while True:
             try:
-                choice = input("> ")
+                choice = input("> ").strip()
                 if choice.lower() == 'q':
                     break
                 
-                idx = int(choice)
+                parts = choice.split()
+                if not parts:
+                    continue
+                    
+                idx = int(parts[0])
+                speed = 1.0
+                if len(parts) > 1:
+                    speed = float(parts[1])
+
                 if 0 <= idx < len(motions):
                     selected = motions[idx]
-                    logger.info(f"Playing {os.path.basename(selected)}...")
-                    motion_ctrl.play(selected)
+                    logger.info(f"Playing {os.path.basename(selected)} at {speed}x speed...")
+                    motion_ctrl.play(selected, speed)
                     logger.info("Done.")
                 else:
                     print("Invalid selection.")
             except ValueError:
-                print("Please enter a number or 'q'.")
+                print("Please enter a valid number (and optional speed) or 'q'.")
             except KeyboardInterrupt:
                 print("\nExiting...")
                 break

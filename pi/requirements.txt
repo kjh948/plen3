@@ -1,2 +1,3 @@
-adafruit-circuitpython-pca9685
-adafruit-blinka
+# No external pip packages required.
+# Ensure system I2C library is installed:
+# sudo apt-get install python3-smbus

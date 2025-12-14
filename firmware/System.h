@@ -32,7 +32,7 @@ class Stream;
 #endif
 
 #ifndef WIFI_PASS
-#define WIFI_PASS "jeeh19800413!"
+#define WIFI_PASS "!"
 #endif
 
 namespace PLEN2 {
