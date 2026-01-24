@@ -26,7 +26,7 @@ class PlacoWalkEngine:
         self.model_filename = model_filename
         self.ignore_feet_contact = ignore_feet_contact
 
-        robot_type = asset_path.split("/")[-1]
+        robot_type = os.path.basename(os.path.normpath(asset_path))
         if robot_type in ["open_duck_mini", "go_bdx"]:
             knee_limits = knee_limits or [-0.2, -0.01]
         else:
@@ -49,8 +49,15 @@ class PlacoWalkEngine:
         self.solver.enable_joint_limits(False)
         self.solver.dt = DT / REFINE
 
-        self.robot.set_joint_limits("left_knee", *knee_limits)
-        self.robot.set_joint_limits("right_knee", *knee_limits)
+        if robot_type == "plen2":
+            left_knee_name = "l_knee_l_shin"
+            right_knee_name = "r_knee_r_shin"
+        else:
+            left_knee_name = "left_knee"
+            right_knee_name = "right_knee"
+
+        self.robot.set_joint_limits(left_knee_name, *knee_limits)
+        self.robot.set_joint_limits(right_knee_name, *knee_limits)
 
         # Creating the walk QP tasks
         self.tasks = placo.WalkTasks()
