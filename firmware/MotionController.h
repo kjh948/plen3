@@ -118,6 +118,13 @@ public:
   */
   void dump(unsigned char slot);
 
+  /*!
+          @brief Set motion playback speed percentage
+
+          @param [in] percent Speed percentage (e.g. 50, 100, 200)
+  */
+  void setSpeed(int percent);
+
 private:
   enum { FRAMEBUFFER_LENGTH = 2 };
 
@@ -128,6 +135,7 @@ private:
 
   unsigned char m_transition_count;
   bool m_playing;
+  int m_speed_percent;
 
   Motion::Header m_header;
   Motion::Frame m_buffer[FRAMEBUFFER_LENGTH];

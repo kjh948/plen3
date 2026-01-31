@@ -15,6 +15,7 @@
 #include "Profiler.h"
 #include "System.h"
 
+
 namespace {
 enum { PRECISION = 16 };
 
@@ -31,9 +32,9 @@ PLEN2::MotionController::MotionController(JointController &joint_ctrl) {
   m_joint_ctrl_ptr = &joint_ctrl;
 
   m_playing = false;
-  m_transition_count = 0;
   m_frame_current_ptr = m_buffer;
   m_frame_next_ptr = m_buffer + 1;
+  m_speed_percent = 100;
 
   for (char joint_id = 0; joint_id < JointController::SUM; joint_id++) {
     m_frame_current_ptr->joint_angle[joint_id] = 0;
@@ -151,17 +152,11 @@ void PLEN2::MotionController::m_setupFrame(unsigned char index) {
 #endif
   m_frame_next_ptr->get(m_header.slot);
 
+  long actual_transition_time =
+      static_cast<long>(m_frame_next_ptr->transition_time_ms) * 100 /
+      m_speed_percent;
   m_transition_count =
-      m_frame_next_ptr->transition_time_ms / Motion::Frame::UPDATE_INTERVAL_MS;
-#if DEBUG_LESS
-  System::debugSerial().print(F("m_transition_count"));
-  System::debugSerial().println(m_transition_count);
-  System::debugSerial().print(F("m_frame_next_ptr->transition_time_ms"));
-  System::debugSerial().println(m_frame_next_ptr->transition_time_ms);
-  System::debugSerial().print(F("JointController::SUM"));
-  System::debugSerial().println(JointController::SUM);
-
-#endif
+      actual_transition_time / Motion::Frame::UPDATE_INTERVAL_MS;
   for (char joint_id = 0; joint_id < JointController::SUM; joint_id++) {
     m_current_fixed_points[joint_id] =
         fixed_cast(m_frame_current_ptr->joint_angle[joint_id]);
@@ -170,12 +165,6 @@ void PLEN2::MotionController::m_setupFrame(unsigned char index) {
         fixed_cast(m_frame_next_ptr->joint_angle[joint_id]) -
         m_current_fixed_points[joint_id];
     m_diff_fixed_points[joint_id] /= m_transition_count;
-
-#if DEBUG_LESS
-    System::debugSerial().print(F("m_diff_fixed_points[joint_id] = "));
-    System::debugSerial().println(m_diff_fixed_points[joint_id]);
-
-#endif
   }
 }
 
@@ -362,4 +351,10 @@ void PLEN2::MotionController::dump(unsigned char slot) {
   System::outputSerial().println(F("\t]"));
 
   System::outputSerial().println(F("}"));
+}
+
+void PLEN2::MotionController::setSpeed(int percent) {
+  if (percent <= 0)
+    return;
+  m_speed_percent = percent;
 }

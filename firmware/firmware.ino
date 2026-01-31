@@ -14,7 +14,7 @@
 
 
 #include "ExternalFs.h"
-#include "Interpreter.h"
+#include "Interpreter.h" 3
 #include "JointController.h"
 #include "Motion.h"
 #include "MotionController.h"
@@ -43,6 +43,8 @@ Interpreter interpreter(motion_ctrl);
 AccelerationGyroSensor sensor;
 Soul soul(sensor, motion_ctrl);
 #endif
+
+namespace {
 
 /*!
         The application instance
@@ -423,6 +425,7 @@ void (Application::**Application::EVENT_HANDLER[])() = {
     Application::GETTER_EVENT_HANDLER};
 
 Application app;
+} // namespace
 
 /*!
         @brief Setup
